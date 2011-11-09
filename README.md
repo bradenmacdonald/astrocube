@@ -36,9 +36,11 @@ Features
 Installation
 -----
 To install, simply run the following command:
-```shell
+
+```
 pip install --user git+git://github.com/bradenmacdonald/astrocube.git#egg=astrocube 
 ```
+
 (Requires that you have [pip](http://www.pip-installer.org) and 
 [distribute](http://pypi.python.org/pypi/distribute) installed.)
 
@@ -47,7 +49,8 @@ editable version, add `-e` as an argument just after `--user`.
 
 Usage
 -----
-Using ipython and pylab to view the spatial noise deviation in a cube:
+Using [IPython](http://ipython.org/) and pylab to view the spatial noise
+deviation in a cube:
 
 ```python
 # Enter these commands into ipython with pylab enabled:
