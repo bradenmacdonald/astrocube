@@ -219,7 +219,6 @@ class CubeViewDialog(gtk.Dialog):
     def run(self):        
         self.show_all()
         gtk.Dialog.run(self)
-        print("Got here, so hiding...")
         # In case there is no existing main gtk loop, run three iterations
         # so that the dialog actually gets hidden properly:
         self.hide()
