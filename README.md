@@ -48,6 +48,7 @@ editable version, add `-e` as an argument just after `--user`.
 Usage
 -----
 Using ipython and pylab to view the spatial noise deviation in a cube:
+
 ```python
 # Enter these commands into ipython with pylab enabled:
 import astrocube
@@ -56,6 +57,7 @@ imshow(cube.noise_dev_xy) # n.b. by default the matplotlib y axis is upside-down
 ```
 
 Visualizing and interacting with a cube using a simple GUI:
+
 ```python
 import astrocube
 import astrocube.cubeview
