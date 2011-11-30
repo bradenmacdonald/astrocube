@@ -36,6 +36,9 @@ class CubeViewWidget(gtk.VBox):
         
         canvas = FigureCanvasGTKAgg(fig)  # a gtk.DrawingArea
         self.pack_start(canvas)
+        
+        # The toolbar:
+        self.pack_start(gtk.HSeparator(), False,False)
         self.toolbar = self._NavigationToolbar(cube, canvas, parent_window) # parent_window is needed for the "Save image..." file chooser dialog
         self.toolbar.remove(self.toolbar.get_nth_item(6)) # Remove the "Configure subplots" button which causes rendering issues if used
         self.pack_start(self.toolbar, False, False)
@@ -45,6 +48,8 @@ class CubeViewWidget(gtk.VBox):
         canvas.mpl_connect('motion_notify_event', self._figure_mousemoved)
         self._is_mouse_down = False # is the mouse button currently pressed?
         
+        # The velocity navigation:
+        self.pack_start(gtk.HSeparator(), False,False)
         scale = gtk.HScale()
         self.scale = scale
         scale.set_range(0, cube.data.shape[2]-1)
