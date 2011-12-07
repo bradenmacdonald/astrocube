@@ -48,6 +48,9 @@ class CubeViewWidget(gtk.VBox):
         canvas.mpl_connect('motion_notify_event', self._figure_mousemoved)
         self._is_mouse_down = False # is the mouse button currently pressed?
         
+        # A list of methods to call when the user clicks on a point. Passes an (x,y,z) tuple and a flux value to each function
+        self.click_notify = [] 
+        
         # The velocity navigation:
         self.pack_start(gtk.HSeparator(), False,False)
         scale = gtk.HScale()
@@ -126,12 +129,18 @@ class CubeViewWidget(gtk.VBox):
         if event.xdata != None and event.ydata != None: # If we're in the canvas:
             self.x = int(event.xdata)
             self.y = int(event.ydata)
+            for func in self.click_notify:
+                func((self._x, self._y, self._z), self.cube.data[self._x, self._y, self._z])
         self._is_mouse_down = False
     def _figure_mousemoved(self, event):
         if self._is_mouse_down and (event.xdata != None and event.ydata != None): # If we're in the canvas:
             self.x = int(event.xdata)
             self.y = int(event.ydata)
         # Note other mouse motion updates get processed below in _NavigationToolbar.mouse_move
+    
+    def on_click(self, func):
+        if not func in self.click_notify:
+            self.click_notify += [func] 
 
     def _check_redraw(self):
         ''' Update this widget's display if needed. Called only when the main event loop is idle '''
