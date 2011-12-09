@@ -8,12 +8,12 @@ Uses GTK as a widget library
 
 import gtk
 import matplotlib
-import numpy
+import numpy as np
 from matplotlib.backends.backend_gtkagg import FigureCanvasGTKAgg, NavigationToolbar2GTKAgg
 
 class CubeViewWidget(gtk.VBox):
 
-    def __init__(self, cube, parent_window):
+    def __init__(self, cube, parent_window, cmap=None):
         gtk.VBox.__init__(self, False)
         
         self.cube = cube
@@ -22,17 +22,23 @@ class CubeViewWidget(gtk.VBox):
         
         fig = matplotlib.figure.Figure()
         self.fig = fig # Save a reference to the figure
-        axes = fig.add_subplot(111)
-        self.imgplot = axes.imshow(cube.data[:,:,self._z].transpose(1,0), cmap="spectral",vmin=0, vmax=numpy.nanmax(cube.data))
+        self.axes = fig.add_subplot(111)
+        if cmap is None: # Use the default color map:
+            #cmap = "spectral"
+            cmap = matplotlib.colors.LinearSegmentedColormap.from_list('astrocube', ['black', 'purple', 'darkblue', 'cyan', 'green', 'yellow', 'orange'])
+        self.imgplot = self.axes.imshow(cube.data[:,:,self._z].transpose(1,0), cmap=cmap,vmin=0, vmax=np.nanmax(cube.data))
         fig.colorbar(self.imgplot) # Add a color scale at the right-hand side
-        axes.set_xlabel(u"Right Ascension \u03b1")
-        axes.xaxis.set_major_formatter(self._AxisFormatter(self.cube))
-        axes.set_ylabel(u"Declination \u03b4")
-        axes.yaxis.set_major_formatter(self._AxisFormatter(self.cube))
-        axes.set_ylim(0,cube.data.shape[1])
+        self.axes.set_xlabel(u"Right Ascension \u03b1")
+        self.axes.xaxis.set_major_formatter(self._AxisFormatter(self.cube))
+        self.axes.set_ylabel(u"Declination \u03b4")
+        self.axes.yaxis.set_major_formatter(self._AxisFormatter(self.cube))
+        self.axes.set_ylim(0,cube.data.shape[1])
         
-        self.xline = axes.axvline(x=self._x, linewidth=4, color="white", alpha=0.5)
-        self.yline = axes.axhline(y=self._y, linewidth=4, color="white", alpha=0.5)
+        self._imgplot_highlight = None # An imshow plot of a highlight mask, if any
+        self._highlight_mask = None
+        
+        self.xline = self.axes.axvline(x=self._x, linewidth=4, color="white", alpha=0.5)
+        self.yline = self.axes.axhline(y=self._y, linewidth=4, color="white", alpha=0.5)
         
         canvas = FigureCanvasGTKAgg(fig)  # a gtk.DrawingArea
         self.pack_start(canvas)
@@ -70,6 +76,11 @@ class CubeViewWidget(gtk.VBox):
         gtk.idle_add(CubeViewWidget._check_redraw, self) # we only want to re re-drawing when the GUI is idle, for maximum interactivity
         
         self.toolbar.update_mouseout_message()
+        
+        # A list of "highlighters" that can be used to color in specific
+        # areas of the plot:
+        self._highlighters = []
+        
     @property
     def x(self): return self._x
     @x.setter
@@ -115,6 +126,8 @@ class CubeViewWidget(gtk.VBox):
         self.needs_redraw = True # We have changed the current coordinates, so will need to redraw
         if self.scale.get_value() != self._z:
             self.scale.set_value(self._z)
+        for h in self._highlighters:
+            h._update_z()
 
     def _update_velocity(self, scale_widget):
         self.z = int(scale_widget.get_value())
@@ -139,6 +152,10 @@ class CubeViewWidget(gtk.VBox):
         # Note other mouse motion updates get processed below in _NavigationToolbar.mouse_move
     
     def on_click(self, func):
+        """
+        Register a function to be called when the user clicks on a point.
+        Event code passes an (x,y,z) tuple and a flux value to each function
+        """
         if not func in self.click_notify:
             self.click_notify += [func] 
 
@@ -157,6 +174,52 @@ class CubeViewWidget(gtk.VBox):
             self.fig.canvas.draw()
             self.needs_redraw = False
         return True
+    
+    def create_highlighter(self, color='red', alpha=0.75):
+        """
+        Set up a plot for interactive highlighting.
+        This will return a Highlighter object with a highlight(data)
+        method; simply call that method and pass a data array with the same
+        shape as the cube data. Any values greater than zero in the passed
+        data will get highlighted.
+        """
+        h = self._Highlighter(self, color, alpha, self.axes)
+        self._highlighters.append(h)
+        return h
+    
+    
+    class _Highlighter:
+        def __init__(self, cube_view, color, alpha, axes):
+            """ Do not call this yourself, but rather use create_highlighter() above """
+            self.cube_view = cube_view
+            # Create an array of nans with same shape as data:
+            self.nans = np.empty(cube_view.cube.data.shape)
+            self.nans.fill(np.nan)
+            self.hdata = self.nans
+            cmap = matplotlib.colors.ListedColormap([color])
+            cmap.set_bad(alpha=0)
+            self.imgplot = cube_view.axes.imshow(self.hdata[:,:,cube_view.z].transpose(1,0), alpha=alpha, cmap=cmap,vmin=0,vmax=0)
+            
+        def highlight(self, new_mask):
+            """
+            Any new_mask should be a boolean ndarray with same shape as data.
+            Any True values will get highlighted.
+            """
+            assert(new_mask.shape == self.cube_view.cube.data.shape)
+            self.hdata = self.nans.copy()#hdata
+            self.hdata[new_mask] = 1
+            self._update_imgplot()
+        def clear(self):
+            self.hdata = self.nans#np.zeros(self.cube_view.cube.data.shape)
+            self._update_imgplot()
+        def _update_imgplot(self, trigger_redraw=True):
+            """ Called after highlight data has changed """
+            self.imgplot.set_data(self.hdata[:,:,self.cube_view.z].transpose(1,0))
+            if trigger_redraw:
+                self.cube_view.needs_redraw = True
+        def _update_z(self):
+            """ To be called by cube_view whenever z changes """
+            self._update_imgplot(trigger_redraw=False)
     
     class _AxisFormatter(matplotlib.ticker.Formatter):
         '''
