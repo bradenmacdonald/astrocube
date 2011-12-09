@@ -27,8 +27,9 @@ Features
 + Includes a simple algorithm for determining the standard deviation of 
   noise in the cube as a function of position. 
 + Has a `CubeViewDialog` class that can be used from ipython or other
-  applications to display a data cube, browse through its contents, and 
-  select points from within the cube (uses matplotlib and pygtk)
+  applications to display a data cube, browse through its contents,  
+  select points from within the cube (uses matplotlib and pygtk),
+  and highlight regions of the cube with different colors
 + Installs a script called `astrocubeview.py`, which provides a simple
   ipython-like interface for quickly viewing a data cube and executing
   arbitrary commands using the data in the cube (uses matplotlib and pygtk)
@@ -38,14 +39,14 @@ Installation
 To install, simply run the following command:
 
 ```
-pip install --user git+git://github.com/bradenmacdonald/astrocube.git#egg=astrocube 
+pip install git+git://github.com/bradenmacdonald/astrocube.git#egg=astrocube 
 ```
 
 (Requires that you have [pip](http://www.pip-installer.org) and 
 [distribute](http://pypi.python.org/pypi/distribute) installed.)
 
-To install it system-wide, remove the `--user` argument. To install an 
-editable version, add `-e` as an argument just after `--user`. 
+To install it locally (not system-wide), add a `--user` argument after 
+"install". To install an editable version, add a `-e` argument. 
 
 Usage
 -----
