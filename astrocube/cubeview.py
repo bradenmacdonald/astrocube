@@ -175,46 +175,44 @@ class CubeViewWidget(gtk.VBox):
             self.needs_redraw = False
         return True
     
-    def create_highlighter(self, color='red', alpha=0.75):
+    def create_highlighter(self, color='red'):
         """
         Set up a plot for interactive highlighting.
         This will return a Highlighter object with a highlight(data)
         method; simply call that method and pass a data array with the same
-        shape as the cube data. Any values greater than zero in the passed
-        data will get highlighted.
+        shape as the cube data (see below).
         """
-        h = self._Highlighter(self, color, alpha, self.axes)
+        h = self._Highlighter(self, color, self.axes)
         self._highlighters.append(h)
         return h
     
     
     class _Highlighter:
-        def __init__(self, cube_view, color, alpha, axes):
+        def __init__(self, cube_view, color, axes):
             """ Do not call this yourself, but rather use create_highlighter() above """
             self.cube_view = cube_view
-            # Create an array of nans with same shape as data:
-            self.nans = np.empty(cube_view.cube.data.shape)
-            self.nans.fill(np.nan)
-            self.hdata = self.nans
-            cmap = matplotlib.colors.ListedColormap([color])
-            cmap.set_bad(alpha=0)
-            self.imgplot = cube_view.axes.imshow(self.hdata[:,:,cube_view.z].transpose(1,0), alpha=alpha, cmap=cmap,vmin=0,vmax=0)
+            # Create an RGBA array that we'll pass to imshow:
+            self.preimage = np.zeros([cube_view.cube.data.shape[0],cube_view.cube.data.shape[1],4])
+            self.hdata = np.zeros(cube_view.cube.data.shape)
+            self.preimage[:,:] = matplotlib.colors.colorConverter.to_rgba(color, alpha=0) 
+            self.imgplot = cube_view.axes.imshow(self.preimage)
             
         def highlight(self, new_mask):
             """
-            Any new_mask should be a boolean ndarray with same shape as data.
-            Any True values will get highlighted.
+            Any new_mask should be a float or boolean ndarray with same shape as data.
+            Any True values will get highlighted. Otherwise, values are treated
+            as an alpha channel, so 1 = Fully opaque, 0 = Fully transparent 
             """
             assert(new_mask.shape == self.cube_view.cube.data.shape)
-            self.hdata = self.nans.copy()#hdata
-            self.hdata[new_mask] = 1
+            self.hdata = new_mask
             self._update_imgplot()
         def clear(self):
-            self.hdata = self.nans#np.zeros(self.cube_view.cube.data.shape)
+            self.hdata.fill(0)
             self._update_imgplot()
         def _update_imgplot(self, trigger_redraw=True):
             """ Called after highlight data has changed """
-            self.imgplot.set_data(self.hdata[:,:,self.cube_view.z].transpose(1,0))
+            self.preimage[:,:,3] = self.hdata[:,:,self.cube_view.z].transpose(1,0) 
+            self.imgplot.set_data(self.preimage)
             if trigger_redraw:
                 self.cube_view.needs_redraw = True
         def _update_z(self):
