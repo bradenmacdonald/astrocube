@@ -13,6 +13,8 @@ from matplotlib.backends.backend_gtkagg import FigureCanvasGTKAgg, NavigationToo
 
 class CubeViewWidget(gtk.VBox):
 
+    default_cmap = matplotlib.colors.LinearSegmentedColormap.from_list('astrocube', ['black', 'purple', 'darkblue', 'cyan', 'green', 'yellow', 'orange'])
+    
     def __init__(self, cube, parent_window, cmap=None):
         gtk.VBox.__init__(self, False)
         
@@ -25,9 +27,9 @@ class CubeViewWidget(gtk.VBox):
         self.axes = fig.add_subplot(111)
         if cmap is None: # Use the default color map:
             #cmap = "spectral"
-            cmap = matplotlib.colors.LinearSegmentedColormap.from_list('astrocube', ['black', 'purple', 'darkblue', 'cyan', 'green', 'yellow', 'orange'])
+            cmap = CubeViewWidget.default_cmap 
         self.imgplot = self.axes.imshow(cube.data[:,:,self._z].transpose(1,0), cmap=cmap,vmin=0, vmax=np.nanmax(cube.data))
-        fig.colorbar(self.imgplot) # Add a color scale at the right-hand side
+        self._colorbar = fig.colorbar(self.imgplot) # Add a color scale at the right-hand side
         self.axes.set_xlabel(u"Right Ascension \u03b1")
         self.axes.xaxis.set_major_formatter(self._AxisFormatter(self.cube))
         self.axes.set_ylabel(u"Declination \u03b4")
@@ -61,14 +63,10 @@ class CubeViewWidget(gtk.VBox):
         self.pack_start(gtk.HSeparator(), False,False)
         scale = gtk.HScale()
         self.scale = scale
-        scale.set_range(0, cube.data.shape[2]-1)
         scale.set_digits(0)
+        self._initialize_scale_element() # Set up the range and marks on the Z slider scale
         scale.set_value(self._z)
         scale.set_draw_value(False)# Hide the built in display of the current value since it's not in real units (not in km/s)
-        vel_middle = int(cube.data.shape[2]/2)
-        scale.add_mark(0, gtk.POS_BOTTOM, "{vel} {units}".format(vel=cube.velocity_at(z=0,decimals=0), units="km/s"))
-        scale.add_mark(vel_middle, gtk.POS_BOTTOM, "{vel} {units}".format(vel=cube.velocity_at(z=vel_middle,decimals=0), units="km/s"))
-        scale.add_mark(cube.data.shape[2]-1, gtk.POS_BOTTOM, "{vel} {units}".format(vel=cube.velocity_at(z=cube.data.shape[2]-1,decimals=0), units="km/s"))
         self.pack_start(scale, False, False)
         scale.connect("value-changed", self._update_velocity)
         
@@ -129,6 +127,35 @@ class CubeViewWidget(gtk.VBox):
         for h in self._highlighters:
             h._update_z()
 
+    def update(self):
+        """
+        Call this method if you have changed cube.data
+        """
+        self._colorbar.update_normal(self.imgplot)
+        self.axes.xaxis.set_major_formatter(self._AxisFormatter(self.cube))
+        self.axes.yaxis.set_major_formatter(self._AxisFormatter(self.cube))
+        self._initialize_scale_element()
+        self.last_drawn_z = -1 # Invalidate the last render
+        # Update any highlighters:
+        for h in self._highlighters:
+            h._generate_preimage()
+            h._hdata = np.zeros(self.cube.data.shape)
+        # The following will ensure the x,y,z values are valid
+        # and will trigger a re-rendering of the plot:
+        self.x, self.y, self.z = self._x, self._y, self._z
+
+    def _initialize_scale_element(self):
+        """
+        Set up those parts of the velocity scale that need to be reset whenever
+        the data changes
+        """
+        self.scale.set_range(0, self.cube.data.shape[2]-1)
+        self.scale.clear_marks()
+        self.scale.add_mark(0, gtk.POS_BOTTOM, "{vel} {units}".format(vel=self.cube.velocity_at(z=0,decimals=0), units="km/s"))
+        vel_middle = int(self.cube.data.shape[2]/2)
+        self.scale.add_mark(vel_middle, gtk.POS_BOTTOM, "{vel} {units}".format(vel=self.cube.velocity_at(z=vel_middle,decimals=0), units="km/s"))
+        self.scale.add_mark(self.cube.data.shape[2]-1, gtk.POS_BOTTOM, "{vel} {units}".format(vel=self.cube.velocity_at(z=self.cube.data.shape[2]-1,decimals=0), units="km/s"))
+        
     def _update_velocity(self, scale_widget):
         self.z = int(scale_widget.get_value())
         self.toolbar.update_mouseout_message() # the current velocity shown in the status message must be updated.
@@ -190,12 +217,12 @@ class CubeViewWidget(gtk.VBox):
     class _Highlighter:
         def __init__(self, cube_view, color, axes):
             """ Do not call this yourself, but rather use create_highlighter() above """
+            self.color = color
             self.cube_view = cube_view
             # Create an RGBA array that we'll pass to imshow:
-            self.preimage = np.zeros([cube_view.cube.data.shape[0],cube_view.cube.data.shape[1],4])
-            self.hdata = np.zeros(cube_view.cube.data.shape)
-            self.preimage[:,:] = matplotlib.colors.colorConverter.to_rgba(color, alpha=0) 
-            self.imgplot = cube_view.axes.imshow(self.preimage)
+            self._generate_preimage()
+            self._hdata = np.zeros(cube_view.cube.data.shape) 
+            self.imgplot = cube_view.axes.imshow(self._preimage)
             
         def highlight(self, new_mask):
             """
@@ -204,20 +231,27 @@ class CubeViewWidget(gtk.VBox):
             as an alpha channel, so 1 = Fully opaque, 0 = Fully transparent 
             """
             assert(new_mask.shape == self.cube_view.cube.data.shape)
-            self.hdata = new_mask
+            self._hdata = new_mask
             self._update_imgplot()
         def clear(self):
-            self.hdata.fill(0)
+            self._hdata.fill(0)
             self._update_imgplot()
         def _update_imgplot(self, trigger_redraw=True):
             """ Called after highlight data has changed """
-            self.preimage[:,:,3] = self.hdata[:,:,self.cube_view.z].transpose(1,0) 
-            self.imgplot.set_data(self.preimage)
+            self._preimage[:,:,3] = self._hdata[:,:,self.cube_view.z].transpose(1,0)
+            self.imgplot.set_data(self._preimage)
             if trigger_redraw:
                 self.cube_view.needs_redraw = True
         def _update_z(self):
             """ To be called by cube_view whenever z changes """
             self._update_imgplot(trigger_redraw=False)
+        def _generate_preimage(self):
+            """
+            Create an RGBA array that we can pass to imshow.
+            Note axis 0 in the image is axis 1 in our cube data
+            """
+            self._preimage = np.zeros([self.cube_view.cube.data.shape[1],self.cube_view.cube.data.shape[0],4])
+            self._preimage[:,:] = matplotlib.colors.colorConverter.to_rgba(self.color, alpha=0)
     
     class _AxisFormatter(matplotlib.ticker.Formatter):
         '''
