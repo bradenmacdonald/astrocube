@@ -11,9 +11,7 @@ About
 -----
 
 This package provides a simple interface for loading radio astronomy data cubes 
-from a FITS file. It was written primarily as an exercise for me to learn more
-about working with data cubes. Thus it is **alpha quality** and not tested
-thoroughly enough to be relied upon for other work.
+from a FITS file. 
 
 Developed for use with Python 2.7
 
@@ -33,6 +31,9 @@ Features
 + Installs a script called `astrocubeview.py`, which provides a simple
   ipython-like interface for quickly viewing a data cube and executing
   arbitrary commands using the data in the cube (uses matplotlib and pygtk)
++ Also capable of loading artificial data cubes that do not have coordinate
+  information (only "OBJECT", "LINENAME", and "NAXIS" headers are required
+  in the FITS file as of version 0.2).
 
 Installation
 -----
@@ -85,4 +86,6 @@ However, the numpy ndarray indices accessible through the `DataCube` class
 are standardized to follow Python conventions, not FITS/FORTRAN conventions. 
 This means that the first index is the x axis (right ascension), the second 
 index is the y axis (declination), and the third index is the z axis 
-(spectral dimension).
+(spectral dimension). (Exception: when loading data from cubes that do not 
+have coordinate information in the FITS header, the indices are kept in the
+same order found in the file.)

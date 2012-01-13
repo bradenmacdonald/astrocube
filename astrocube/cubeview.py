@@ -151,10 +151,11 @@ class CubeViewWidget(gtk.VBox):
         """
         self.scale.set_range(0, self.cube.data.shape[2]-1)
         self.scale.clear_marks()
-        self.scale.add_mark(0, gtk.POS_BOTTOM, "{vel} {units}".format(vel=self.cube.velocity_at(z=0,decimals=0), units="km/s"))
-        vel_middle = int(self.cube.data.shape[2]/2)
-        self.scale.add_mark(vel_middle, gtk.POS_BOTTOM, "{vel} {units}".format(vel=self.cube.velocity_at(z=vel_middle,decimals=0), units="km/s"))
-        self.scale.add_mark(self.cube.data.shape[2]-1, gtk.POS_BOTTOM, "{vel} {units}".format(vel=self.cube.velocity_at(z=self.cube.data.shape[2]-1,decimals=0), units="km/s"))
+        if self.cube.has_coords:
+            self.scale.add_mark(0, gtk.POS_BOTTOM, "{vel} {units}".format(vel=self.cube.velocity_at(z=0,decimals=0), units="km/s"))
+            vel_middle = int(self.cube.data.shape[2]/2)
+            self.scale.add_mark(vel_middle, gtk.POS_BOTTOM, "{vel} {units}".format(vel=self.cube.velocity_at(z=vel_middle,decimals=0), units="km/s"))
+            self.scale.add_mark(self.cube.data.shape[2]-1, gtk.POS_BOTTOM, "{vel} {units}".format(vel=self.cube.velocity_at(z=self.cube.data.shape[2]-1,decimals=0), units="km/s"))
         
     def _update_velocity(self, scale_widget):
         self.z = int(scale_widget.get_value())
@@ -264,7 +265,9 @@ class CubeViewWidget(gtk.VBox):
             self.cube = cube
         def __call__(self, coord, pos=None):
             a = self.axis.axis_name
-            if a == "x":
+            if not self.cube.has_coords:
+                return ""
+            elif a == "x":
                 #return u"{0:.2f}\u00b0".format( self.cube.point_coords(coord,0,0)[0] ) # \u00b0 : degree symbol
                 return self.cube.point_coords_str(coord,0,0,ra_fmt="hms",decimals=0)[0]
             elif a == "y":

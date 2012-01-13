@@ -41,16 +41,23 @@ class DataCube:
         
         # Now use pywcs to interpret the coordinates and re-index the array to a standardized (RA, DEC, VEL) zero-based index
         self._wcs = pywcs.WCS(self._header)
-        assert(self._wcs.wcs.lngtyp == 'RA') # the "longitude" axis should be the right ascension
-        assert(self._wcs.wcs.lattyp == 'DEC')# the "latitude" axis should be the declination
-        # Record the axis indices according to pywcs, needed when doing pixel-to-sky-coord conversions:
-        self._index_ra = self._wcs.wcs.lng
-        self._index_dec = self._wcs.wcs.lat
-        self._index_vel = self._wcs.wcs.spec
-        
-        
-        last_axis = 2 # index of the third axis is 2 - we need this in order to reverse the FITS axis order
-        self.data = hdu.data.transpose((last_axis-self._wcs.wcs.lng, last_axis-self._wcs.wcs.lat, last_axis-self._wcs.wcs.spec)) # longitude index = right ascension; latitude index = declination, then spectral
+        if self._wcs.wcs.lat != -1:
+            self.has_coords = True
+            # Set up use of PyWCS:
+            assert(self._wcs.wcs.lngtyp == 'RA') # the "longitude" axis should be the right ascension
+            assert(self._wcs.wcs.lattyp == 'DEC')# the "latitude" axis should be the declination
+            # Record the axis indices according to pywcs, needed when doing pixel-to-sky-coord conversions:
+            self._index_ra = self._wcs.wcs.lng
+            self._index_dec = self._wcs.wcs.lat
+            self._index_vel = self._wcs.wcs.spec
+            last_axis = 2 # index of the third axis is 2 - we need this in order to reverse the FITS axis order
+            self.data = hdu.data.transpose((last_axis-self._wcs.wcs.lng, last_axis-self._wcs.wcs.lat, last_axis-self._wcs.wcs.spec)) # longitude index = right ascension; latitude index = declination, then spectral
+        else:
+            # This data cube has no coordinates PyWCS can use
+            self.has_coords = False
+            self._wcs = None
+            self.data = hdu.data
+
         
         if calc_noise_dev:
             self.calc_noise_dev() # You can always call this again later with different parameters
@@ -133,6 +140,8 @@ class DataCube:
         (ra,dec,vel) where ra,dec are in degrees, and vel is in km/s. The units get automatically 
         standardized thanks to pywcs.
         """
+        if not self._wcs:
+            raise Exception("This FITS file has no useable coordinate data.")
         raw_coord = [0,0,0]
         raw_coord[self._index_ra] = x
         raw_coord[self._index_dec] = y
@@ -152,6 +161,8 @@ class DataCube:
         
         Decimals is the number of decimal places returned within each string.
         """
+        if not self._wcs:
+            return ("?","?","?")
         valid_formats = ["deg", "hms", "dms"]
         assert(ra_fmt in valid_formats and dec_fmt in valid_formats)
         coords = self.point_coords(x, y, z)
