@@ -131,6 +131,7 @@ class CubeViewWidget(gtk.VBox):
         """
         Call this method if you have changed cube.data
         """
+        self.imgplot.set_clim(vmin=0, vmax=np.nanmax(self.cube.data))
         self._colorbar.update_normal(self.imgplot)
         self.axes.xaxis.set_major_formatter(self._AxisFormatter(self.cube))
         self.axes.yaxis.set_major_formatter(self._AxisFormatter(self.cube))
