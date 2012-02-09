@@ -34,18 +34,16 @@ class DataCube:
         
         self._header = hdu.header
         
-        if not (set(("OBJECT", "LINENAME", "NAXIS")) <= set(self._header.keys()) and self._header["NAXIS"] == 3):
-            raise Exception("This does not seem to be a valid data cube. It should be a 3-axis FITS file that defines LINENAME and OBJECT.")
-        self.object_name = self._header["OBJECT"]
-        self.line_name = self._header["LINENAME"]
+        if not self._header.get("NAXIS", 0) == 3:
+            raise Exception("This does not seem to be a valid data cube. It should be a 3-axis FITS file.")
+        self.object_name = self._header.get("OBJECT", "?")
+        self.line_name = self._header.get("LINENAME", "?")
         
         # Now use pywcs to interpret the coordinates and re-index the array to a standardized (RA, DEC, VEL) zero-based index
         self._wcs = pywcs.WCS(self._header)
-        if self._wcs.wcs.lat != -1:
+        if self._wcs.wcs.lat != -1 and self._wcs.wcs.lngtyp == 'RA' and self._wcs.wcs.lattyp == 'DEC':
             self.has_coords = True
             # Set up use of PyWCS:
-            assert(self._wcs.wcs.lngtyp == 'RA') # the "longitude" axis should be the right ascension
-            assert(self._wcs.wcs.lattyp == 'DEC')# the "latitude" axis should be the declination
             # Record the axis indices according to pywcs, needed when doing pixel-to-sky-coord conversions:
             self._index_ra = self._wcs.wcs.lng
             self._index_dec = self._wcs.wcs.lat
